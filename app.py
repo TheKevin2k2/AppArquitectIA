@@ -1,64 +1,78 @@
 import streamlit as st
-import requests
-import base64
 from PIL import Image
-import io
+import requests
 import urllib.parse
 import time
 
-API_KEY = "AIzaSyBLASApDrxbH68KPuNQJxWMCQPLBOYR4yk"
-URL_GEMINI = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={API_KEY}"
+st.set_page_config(page_title="ArquitectIA Open-Source", layout="wide")
 
-st.set_page_config(page_title="ArquitectIA v11 Master", layout="wide")
+# --- LÓGICA DE DATOS DEL EXCEL (FASE 3 Y 4) ---
+precios_unitarios = {
+    "Residencial de Lujo": {
+        "Mármol Carrara": {"unidad": "m2", "costo": 2500, "color": "#E5E4E2"},
+        "Nogal Americano": {"unidad": "m2", "costo": 1800, "color": "#4B3621"},
+        "Concreto Aparente": {"unidad": "m2", "costo": 950, "color": "#808080"}
+    },
+    "Nave Industrial": {
+        "Estructura Metálica": {"unidad": "kg", "costo": 45, "color": "#2F4F4F"},
+        "Concreto HR": {"unidad": "m3", "costo": 2200, "color": "#A9A9A9"},
+        "Lámina Pintro": {"unidad": "m2", "costo": 320, "color": "#708090"}
+    }
+}
 
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🏗️ ArquitectIA v11.0: Master Control</h1>", unsafe_allow_html=True)
+st.title("🏗️ Sistema de Presupuestación ArquitectIA")
+st.caption("Módulo de Cálculo Gratuito basado en Plan Maestro v1")
 
 with st.sidebar:
-    st.header("⚙️ Ajustes")
-    estilo = st.selectbox("Estilo:", ["Moderno Sobrio", "Minimalista", "Industrial", "Rústico"])
-    clima = st.selectbox("Luz:", ["Día Soleado", "Atardecer", "Nublado", "Noche"])
+    st.header("📋 Especialización (Fase 2)")
+    modulo = st.radio("Tipo de Proyecto:", ["Residencial de Lujo", "Nave Industrial"])
+    
+    material = st.selectbox("Seleccionar Material (Layout):", list(precios_unitarios[modulo].keys()))
+    
     st.divider()
-    st.error("❗ NOTA PARA TU HERMANO:\nSi la IA 'inventa', es porque la captura tiene poco contraste. Asegúrate de que las sombras sean FUERTES en SketchUp.")
+    st.subheader("📊 Calculadora de Insumos")
+    cantidad = st.number_input("Cantidad detectada (m2/ml):", min_value=1.0, value=10.0)
+    
+    datos_mat = precios_unitarios[modulo][material]
+    total_partida = cantidad * datos_mat['costo']
+    
+    st.metric("Total Partida Est.", f"${total_partida:,} MXN")
+    st.caption(f"Unidad: {datos_mat['unidad']} | Basado en TPU Fase 3")
 
-instrucciones = st.text_input("📝 Materiales:", placeholder="Ej: Concreto, madera clara...")
-archivo = st.file_uploader("🖼️ Sube captura de SketchUp", type=["jpg", "jpeg", "png"])
+# --- INTERFAZ DE RENDER GRATUITO ---
+col1, col2 = st.columns(2)
 
-if archivo:
-    col1, col2 = st.columns(2)
-    img = Image.open(archivo)
-    with col1:
-        st.subheader("Tu Modelo")
+with col1:
+    st.subheader("🖼️ Captura de Layout")
+    archivo = st.file_uploader("Sube tu modelo (Fondo Blanco)", type=["jpg", "png"])
+    if archivo:
+        img = Image.open(archivo)
         st.image(img, use_container_width=True)
 
-    if st.button("🚀 GENERAR RENDER"):
-        with col2:
-            with st.spinner("🛠️ Aplicando texturas sobre geometría..."):
-                try:
-                    buffered = io.BytesIO()
-                    img_convert = img.convert("RGB")
-                    img_convert.save(buffered, format="JPEG", quality=95)
-                    img_byte = base64.b64encode(buffered.getvalue()).decode("utf-8")
+with col2:
+    st.subheader("⚡ Visualización de Concepto")
+    if archivo and st.button("PROCESAR VISTA Y COSTOS"):
+        with st.spinner("Generando atmósfera..."):
+            # En lugar de cambiar la casa, generamos un fondo que combine
+            estilo_prompt = f"Professional architectural site, {modulo}, {material}, photorealistic atmosphere, 8k"
+            url_atmosfera = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(estilo_prompt)}?width=800&height=600&seed={int(time.time())}"
+            
+            # Mostramos el costo y el material como capas de datos
+            st.info(f"**Análisis de Especialización:** {modulo}")
+            st.write(f"Aplicando lógica de {material} sobre geometría detectada.")
+            
+            # Simulamos el renderizado mediante la IA gratuita (Atmósfera)
+            st.image(url_atmosfera, caption="Referencia de Iluminación y Material", use_container_width=True)
+            
+            # Fase 4: Generadores (Tabla de resultados)
+            st.success("✅ Memoria de cálculo generada")
+            st.table({
+                "Concepto": [f"Suministro y colocación de {material}"],
+                "Cantidad": [cantidad],
+                "Unidad": [datos_mat['unidad']],
+                "P.U.": [f"${datos_mat['costo']}"],
+                "Importe": [f"${total_partida}"]
+            })
 
-                    # PROMPT DE ALTA PRECISIÓN: Obliga a la IA a no salirse de los bordes
-                    prompt_tecnico = f"Architectural photo. Keep the EXACT layout and geometry of the building in the image. Do not change wall positions. Materials: {instrucciones}. Style: {estilo}. High-end lighting: {clima}. Realistic 8k render."
-                    
-                    payload = {"contents": [{"parts": [
-                        {"text": prompt_tecnico},
-                        {"inline_data": {"mime_type": "image/jpeg", "data": img_byte}}
-                    ]}]}
-
-                    res = requests.post(URL_GEMINI, json=payload, timeout=15)
-                    desc = res.json()["candidates"][0]["content"]["parts"][0]["text"] if res.status_code == 200 else "Architecture"
-
-                    # HACK: Añadimos 'scanned architectural sketch' para que la IA entienda que hay una base rígida
-                    final_p = f"Professional architectural render of {desc}, realistic materials, preserving exact structure, 8k, photorealistic."
-                    url_f = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(final_p)}?width=1280&height=720&nologo=true&seed={int(time.time())}"
-                    
-                    st.image(url_f, use_container_width=True)
-                    st.success("✅ Renderizado listo.")
-                    
-                    r_img = requests.get(url_f)
-                    st.download_button("💾 Guardar", r_img.content, "render.png", "image/png")
-
-                except Exception as e:
-                    st.error(f"Error: {e}")
+st.divider()
+st.info("💡 **Tip de Negocio:** Esta versión no gasta dinero. Puedes cobrar por el 'Análisis de Costos' y usar la imagen de la derecha solo como referencia visual de materiales.")
