@@ -7,7 +7,6 @@ import urllib.parse
 import time
 
 # --- CONFIGURACIÓN DE SEGURIDAD ---
-# El código buscará la clave en la sección "Secrets" de Streamlit Cloud
 try:
     FAL_KEY = st.secrets["FAL_KEY"]
 except:
@@ -32,7 +31,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown("<h1 class='main-title'>🏗️ ArquitectIA Pro v7.2</h1>", unsafe_allow_html=True)
+st.markdown("<h1 class='main-title'>🏗️ ArquitectIA Pro v7.3</h1>", unsafe_allow_html=True)
 
 # --- BARRA LATERAL ---
 with st.sidebar:
@@ -43,7 +42,6 @@ with st.sidebar:
     
     st.divider()
     
-    # Este es el control más importante para tu hermano
     structural_strength = st.slider(
         "Fidelidad Estructural (0.90 = No cambia la forma):",
         min_value=0.0, max_value=1.0, value=0.90, step=0.05
@@ -78,15 +76,50 @@ if archivo:
             with col2:
                 with st.spinner("🧠 Procesando geometría y texturas..."):
                     try:
-                        # 1. Preparar imagen para la IA
+                        # 1. Preparar imagen
                         buffered = io.BytesIO()
                         img.save(buffered, format="PNG")
                         img_byte = base64.b64encode(buffered.getvalue()).decode("utf-8")
                         image_url = f"data:image/png;base64,{img_byte}"
 
-                        # 2. Configurar el prompt técnico
-                        prompt_final = (
-                            f"Professional architectural photography of the building in the reference image. "
-                            f"Style: {estilo}. Main material: {mat_paredes}. Lighting: {clima}. "
-                            f"Details: {instruccion_usuario}. High-end materials, 8k resolution, "
-                            f"strictly
+                        # 2. Prompt unido en una sola línea para evitar SyntaxError
+                        prompt_final = f"Professional architectural photography. Style: {estilo}. Walls: {mat_paredes}. Lighting: {clima}. {instruccion_usuario}. High-end materials, 8k resolution, strictly preserve original building geometry and footprint."
+
+                        # 3. Llamada al motor Fal.ai
+                        url_fal = "https://fal.run/fal-ai/flux/dev/image-to-image"
+                        headers = {
+                            "Authorization": f"Key {FAL_KEY}",
+                            "Content-Type": "application/json"
+                        }
+                        
+                        payload = {
+                            "prompt": prompt_final,
+                            "image_url": image_url,
+                            "strength": 1.0 - structural_strength,
+                            "num_inference_steps": 40,
+                            "guidance_scale": 7.5
+                        }
+
+                        res = requests.post(url_fal, json=payload, headers=headers, timeout=120)
+                        
+                        if res.status_code == 200:
+                            data = res.json()
+                            if "images" in data:
+                                render_url = data["images"][0]["url"]
+                                st.image(render_url, use_container_width=True)
+                                st.success("✅ Renderizado completado.")
+                                
+                                img_res = requests.get(render_url)
+                                st.download_button(
+                                    label="💾 Descargar Imagen",
+                                    data=img_res.content,
+                                    file_name="render_arquitectia.png",
+                                    mime="image/png"
+                                )
+                            else:
+                                st.error("No se generó la imagen.")
+                        else:
+                            st.error(f"Error de API: {res.status_code}. Revisa tus créditos.")
+
+                    except Exception as e:
+                        st.error(f"Error técnico: {e}")
