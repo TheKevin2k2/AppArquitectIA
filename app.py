@@ -11,22 +11,21 @@ API_KEY = "AIzaSyDCoHVw6g5K1UFEePZmkCv7Co12_OHCoYQ"
 URL_GEMINI = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={API_KEY}"
 
 st.set_page_config(page_title="ArquitectIA: Control Estructural", layout="wide")
-st.title("🏗️ ArquitectIA: Precisión Estructural v6.0")
+st.title("🏗️ ArquitectIA: Precisión Estructural v6.1")
 
-# 2. Barra Lateral con más restricciones
+# 2. Barra Lateral
 with st.sidebar:
     st.header("⚙️ Ajustes de Rigidez")
-    # Forzamos un estilo que no sea "loco"
     estilo = st.selectbox("Estilo Técnico:", ["Moderno Sobrio", "Minimalista", "Contemporáneo"])
-    st.info("Nota: Esta versión usa 'Flux Pro' para intentar mantener las líneas del diseño original.")
+    st.info("Nota: Esta versión usa 'Flux' para intentar mantener las líneas originales.")
     if st.button("🗑️ Reiniciar App"):
         st.rerun()
 
-# 3. Instrucciones del usuario
+# 3. Instrucciones
 st.subheader("📝 Paso 1: Describe la estructura")
 forma_detallada = st.text_area(
-    "Describe la FORMA exacta de tu modelo (ej: 'Es un cubo de dos pisos con una ventana cuadrada a la izquierda'):",
-    placeholder="No dejes que la IA adivine la forma..."
+    "Describe la FORMA exacta de tu modelo:",
+    placeholder="Ej: Es un cubo de dos pisos con un volado a la izquierda..."
 )
 
 # 4. Carga de imagen
@@ -49,14 +48,11 @@ if archivo:
                     img.save(buffered, format="JPEG")
                     img_byte = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-                    # PROMPT DE GEOMETRÍA RÍGIDA
-                    # Le pedimos a Gemini que sea un inspector de obra
+                    # PROMPT DE ANÁLISIS
                     prompt_analisis = (
-                        "Act as a professional architect. Analyze the attached screenshot of a 3D model. "
-                        "Describe the volumes, the exact number of walls, and the position of the windows. "
-                        "Be extremely technical. The goal is to generate a photorealistic render "
-                        "that respects the building's footprint 100%. "
-                        f"Style requested: {estilo}. Extra shape details: {forma_detallada}."
+                        "Act as a professional architect. Analyze the attached screenshot. "
+                        "Describe volumes and window positions technically. "
+                        f"Style: {estilo}. Extra details: {forma_detallada}."
                     )
 
                     payload = {"contents": [{"parts": [
@@ -65,14 +61,31 @@ if archivo:
                     ]}]}
 
                     res = requests.post(URL_GEMINI, json=payload, timeout=20)
-                    descripcion_ia = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    data = res.json()
+                    
+                    if "candidates" in data:
+                        descripcion_ia = data["candidates"][0]["content"]["parts"][0]["text"]
+                    else:
+                        descripcion_ia = "Architectural building, modern style."
 
-                    # MOTOR DE DIBUJO FLUX (Más obediente)
-                    # Añadimos parámetros para evitar que 'invente' nuevas casas
+                    # MOTOR DE DIBUJO FLUX
                     prompt_render = (
-                        f"Architectural photography, ultra-realistic. Building volume exactly like this: {descripcion_ia}. "
-                        "Do not change the building's shape or perspective. High-end materials, cinematic lighting, 8k. "
-                        "Professional real estate photography."
+                        f"Professional architectural photography, ultra-realistic. "
+                        f"Building volume strictly like this: {descripcion_ia}. "
+                        "8k resolution, cinematic lighting, realistic materials."
                     )
                     
-                    final_encoded = urllib.parse.quote(prompt_render[:8
+                    # CORRECCIÓN DEL ERROR DE SINTAXIS AQUÍ:
+                    final_encoded = urllib.parse.quote(prompt_render[:800])
+                    
+                    url_img = f"https://image.pollinations.ai/prompt/{final_encoded}?width=1280&height=720&model=flux&nologo=true&seed={int(time.time())}"
+                    
+                    r = requests.get(url_img, timeout=120)
+                    if r.status_code == 200:
+                        st.image(r.content, use_container_width=True)
+                        st.success("Renderizado finalizado.")
+                        st.download_button("💾 Guardar", r.content, "render.png", "image/png")
+                    else:
+                        st.error("Error en el motor de imagen.")
+                except Exception as e:
+                    st.error(f"Error técnico: {e}")
