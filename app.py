@@ -6,14 +6,16 @@ import io
 import urllib.parse
 import time
 
-# 1. Configuración de API
-# Consigue tu clave gratis en fal.ai para que la fidelidad sea real
-FAL_KEY = "TU_CLAVE_FAL_AI_AQUÍ" 
+# --- CONFIGURACIÓN DE SEGURIDAD ---
+# El código buscará la clave en la sección "Secrets" de Streamlit Cloud
+try:
+    FAL_KEY = st.secrets["FAL_KEY"]
+except:
+    FAL_KEY = "FALTA_CLAVE"
 
-st.set_page_config(page_title="ArquitectIA Pro: Fidelidad Estricta", layout="wide")
-st.title("🏗️ ArquitectIA Pro v7.1 (Motor Fal.ai)")
+st.set_page_config(page_title="ArquitectIA Pro: Control Estructural", layout="wide")
 
-# Estilo visual
+# --- INTERFAZ VISUAL ---
 st.markdown("""
     <style>
     .stFileUploader {
@@ -22,85 +24,69 @@ st.markdown("""
         background-color: #f0f2f6;
         border-radius: 15px;
     }
+    .main-title {
+        color: #1E3A8A;
+        text-align: center;
+        font-weight: bold;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Barra Lateral
+st.markdown("<h1 class='main-title'>🏗️ ArquitectIA Pro v7.2</h1>", unsafe_allow_html=True)
+
+# --- BARRA LATERAL ---
 with st.sidebar:
-    st.header("⚙️ Control de Render")
-    estilo = st.selectbox("Estilo Técnico:", ["Moderno", "Minimalista", "Industrial", "Rústico Moderno"])
-    mat_paredes = st.selectbox("Material Paredes:", ["Concreto Visto", "Ladrillo", "Piedra", "Estuco Blanco", "Madera"])
+    st.header("⚙️ Ajustes de Precisión")
+    estilo = st.selectbox("Estilo Arquitectónico:", ["Moderno Sobrio", "Minimalista", "Industrial", "Rústico Moderno"])
+    mat_paredes = st.selectbox("Material Principal:", ["Concreto Visto", "Ladrillo", "Piedra", "Estuco Blanco", "Madera"])
     clima = st.selectbox("Iluminación:", ["Día Soleado", "Atardecer Cálido", "Nublado Realista", "Noche"])
     
     st.divider()
+    
+    # Este es el control más importante para tu hermano
     structural_strength = st.slider(
-        "Fidelidad Estructural (0.9 = No cambia la forma):",
-        min_value=0.0, max_value=1.0, value=0.85, step=0.05
+        "Fidelidad Estructural (0.90 = No cambia la forma):",
+        min_value=0.0, max_value=1.0, value=0.90, step=0.05
     )
+    
+    st.info("💡 Consejo: Usa 0.90 para que la IA respete cada muro de SketchUp.")
     
     if st.button("🗑️ Limpiar Pantalla"):
         st.rerun()
 
-# 3. Inputs
-st.subheader("📝 Detalles de Acabado")
+# --- ÁREA DE TRABAJO ---
+st.subheader("📝 Detalles Finales")
 instruccion_usuario = st.text_area(
-    "Describe materiales y entorno:",
-    placeholder="Ej: Suelo de grava, marcos negros, vegetación frondosa..."
+    "Describe materiales específicos y el entorno:",
+    placeholder="Ej: Suelo de madera clara, marcos de ventanas negros, añadir mucha vegetación y jardín..."
 )
 
-archivo = st.file_uploader("🖼️ Sube tu captura de SketchUp", type=["jpg", "jpeg", "png"])
+archivo = st.file_uploader("🖼️ Sube tu captura de SketchUp aquí", type=["jpg", "jpeg", "png"])
 
 if archivo:
     col1, col2 = st.columns(2)
     img = Image.open(archivo)
     
     with col1:
-        st.subheader("Modelo Original")
+        st.subheader("Tu Modelo Original")
         st.image(img, use_container_width=True)
 
-    if st.button("🚀 GENERAR RENDER"):
-        if FAL_KEY == "TU_CLAVE_FAL_AI_AQUÍ":
-            st.error("⚠️ Falta la clave API de fal.ai en el código.")
+    if st.button("🚀 GENERAR RENDER PROFESIONAL"):
+        if FAL_KEY == "FALTA_CLAVE":
+            st.error("⚠️ Error: No has configurado la clave 'FAL_KEY' en los Secrets de Streamlit.")
         else:
             with col2:
-                with st.spinner("🧠 Aplicando texturas a la estructura..."):
+                with st.spinner("🧠 Procesando geometría y texturas..."):
                     try:
-                        # Preparar imagen
+                        # 1. Preparar imagen para la IA
                         buffered = io.BytesIO()
                         img.save(buffered, format="PNG")
                         img_byte = base64.b64encode(buffered.getvalue()).decode("utf-8")
                         image_url = f"data:image/png;base64,{img_byte}"
 
+                        # 2. Configurar el prompt técnico
                         prompt_final = (
-                            f"Professional architectural photography. Building style: {estilo}. "
-                            f"Walls: {mat_paredes}. Lighting: {clima}. {instruccion_usuario}. "
-                            "High-end materials, 8k resolution, preserve original geometry."
-                        )
-
-                        url_fal = "https://fal.run/fal-ai/flux/dev/image-to-image"
-                        headers = {"Authorization": f"Key {FAL_KEY}", "Content-Type": "application/json"}
-                        
-                        payload = {
-                            "prompt": prompt_final,
-                            "image_url": image_url,
-                            "strength": 1.0 - structural_strength,
-                            "num_inference_steps": 40,
-                            "guidance_scale": 7.5
-                        }
-
-                        res = requests.post(url_fal, json=payload, headers=headers, timeout=120)
-                        
-                        if res.status_code == 200:
-                            data = res.json()
-                            render_url = data["images"][0]["url"]
-                            st.image(render_url, use_container_width=True)
-                            st.success("Render finalizado.")
-                            
-                            # Botón de descarga
-                            img_res = requests.get(render_url)
-                            st.download_button("💾 Guardar Render", img_res.content, "render.png", "image/png")
-                        else:
-                            st.error(f"Error de API: {res.status_code}")
-
-                    except Exception as e:
-                        st.error(f"Error técnico: {e}")
+                            f"Professional architectural photography of the building in the reference image. "
+                            f"Style: {estilo}. Main material: {mat_paredes}. Lighting: {clima}. "
+                            f"Details: {instruccion_usuario}. High-end materials, 8k resolution, "
+                            f"strictly
