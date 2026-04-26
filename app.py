@@ -38,13 +38,13 @@ with st.sidebar:
     clima = st.selectbox("Iluminación:", ["Soleado", "Atardecer", "Noche", "Nublado"])
     
     st.divider()
-    st.caption("v2.1 - Soporte de portapapeles activado")
+    st.caption("v2.2 - Corrección de sintaxis")
 
 # 3. Input de usuario (Prompt abierto)
 st.subheader("💬 Instrucciones adicionales para la IA")
 instruccion_usuario = st.text_area("Ejemplo: 'Que la puerta sea de roble oscuro y añade un jardín seco en el frente'", placeholder="Escribe aquí los detalles que la IA debe respetar...")
 
-# Cargador de archivos mejorado
+# Cargador de archivos
 archivo = st.file_uploader("Haz clic aquí y presiona Ctrl + V para pegar la captura", type=["jpg", "jpeg", "png"])
 
 if archivo:
@@ -63,7 +63,7 @@ if archivo:
                     img.save(buffered, format="JPEG")
                     img_byte = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-                    # PROMPT ULTRA-ESTRICTO PARA NO CAMBIAR EL DISEÑO
+                    # PROMPT ULTRA-ESTRICTO
                     prompt_fidelidad = "STRICT GEOMETRY. Do not alter the building's shape, windows, or roof lines." if fidelidad == "Máximo (No cambiar formas)" else "Maintain overall structure."
                     
                     prompt_completo = (
@@ -89,4 +89,16 @@ if archivo:
                     url_img = f"https://image.pollinations.ai/prompt/{encoded_p}?width=1280&height=720&nologo=true&seed={int(time.time())}"
                     
                     r = requests.get(url_img, timeout=120)
-                    if r.status_code == 20
+                    
+                    # AQUÍ ESTABA EL ERROR: Corregido a 200 y con ":"
+                    if r.status_code == 200:
+                        st.image(r.content, use_container_width=True)
+                        st.success("Render finalizado")
+                        st.download_button("💾 Guardar", r.content, "render.png", "image/png")
+                    else:
+                        st.error(f"Error del servidor: {r.status_code}")
+                        
+                except Exception as e:
+                    st.error(f"Error: {e}")
+else:
+    st.info("💡 **Cómo pegar:** Toma la captura (Win + Shift + S), haz un clic en el recuadro azul de arriba y presiona **Ctrl + V**.")
