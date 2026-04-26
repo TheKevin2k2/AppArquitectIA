@@ -12,65 +12,61 @@ URL_GEMINI = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.
 
 st.set_page_config(page_title="ArquitectIA Pro: Control Total", layout="wide")
 
-# Estilo personalizado para resaltar el área de pegado
-st.markdown("""
-    <style>
-    .stFileUploader {
-        border: 2px dashed #4A90E2;
-        border-radius: 10px;
-        padding: 10px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
+# Título y manual de uso rápido
 st.title("🏗️ ArquitectIA: Renderizado Profesional")
-st.write("Copia tu captura en SketchUp y **pégala aquí abajo con Ctrl+V**")
 
 # 2. Barra Lateral
 with st.sidebar:
     st.header("🎨 Ajustes de Precisión")
     estilo = st.selectbox("Estilo:", ["Minimalista Moderno", "Industrial Loft", "Rústico", "Futurista"])
-    
-    st.subheader("Rigidez Estructural")
     fidelidad = st.radio("Respeto al volumen original:", ["Máximo (No cambiar formas)", "Equilibrado", "Artístico"])
-    
     mat_paredes = st.selectbox("Paredes:", ["Concreto", "Ladrillo", "Piedra", "Estuco", "Madera"])
     clima = st.selectbox("Iluminación:", ["Soleado", "Atardecer", "Noche", "Nublado"])
-    
     st.divider()
-    st.caption("v2.2 - Corrección de sintaxis")
+    st.caption("v2.3 - Clipboard Fix")
 
-# 3. Input de usuario (Prompt abierto)
-st.subheader("💬 Instrucciones adicionales para la IA")
-instruccion_usuario = st.text_area("Ejemplo: 'Que la puerta sea de roble oscuro y añade un jardín seco en el frente'", placeholder="Escribe aquí los detalles que la IA debe respetar...")
+# 3. ZONA DE CARGA (Aquí está el truco)
+st.subheader("📸 Sube o Pega tu Captura")
+col_input, col_info = st.columns([2, 1])
 
-# Cargador de archivos
-archivo = st.file_uploader("Haz clic aquí y presiona Ctrl + V para pegar la captura", type=["jpg", "jpeg", "png"])
+with col_info:
+    st.info("""
+    **Para pegar con Ctrl+V:**
+    1. Toma la captura (Win+Shift+S).
+    2. Haz UN CLIC en el recuadro de abajo.
+    3. Presiona Ctrl+V.
+    *Si falla, guarda la imagen y arrástrala.*
+    """)
+
+# El cargador de Streamlit en versiones recientes soporta pegar si tiene el foco
+archivo = st.file_uploader("Área de carga (Soporta Pegado Directo)", type=["jpg", "jpeg", "png"])
+
+# 4. Input de usuario
+st.subheader("💬 Instrucciones adicionales")
+instruccion_usuario = st.text_area("Ejemplo: 'Añadir ventanales de piso a techo'", placeholder="Escribe aquí...")
 
 if archivo:
-    col1, col2 = st.columns(2)
+    col_pre, col_res = st.columns(2)
     img = Image.open(archivo)
     
-    with col1:
+    with col_pre:
         st.subheader("Referencia original")
         st.image(img, use_container_width=True)
 
     if st.button("🚀 GENERAR RENDER"):
-        with col2:
-            with st.spinner("🧠 Sincronizando materiales..."):
+        with col_res:
+            with st.spinner("🧠 Generando texturas de alta calidad..."):
                 try:
                     buffered = io.BytesIO()
                     img.save(buffered, format="JPEG")
                     img_byte = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-                    # PROMPT ULTRA-ESTRICTO
-                    prompt_fidelidad = "STRICT GEOMETRY. Do not alter the building's shape, windows, or roof lines." if fidelidad == "Máximo (No cambiar formas)" else "Maintain overall structure."
+                    prompt_fidelidad = "STRICT GEOMETRY. DO NOT ALTER THE BUILDING SHAPE." if fidelidad == "Máximo (No cambiar formas)" else "Maintain overall structure."
                     
                     prompt_completo = (
                         f"{prompt_fidelidad} Architectural visualization. Style: {estilo}. "
                         f"Materials: {mat_paredes}. Lighting: {clima}. "
-                        f"Specific User Request: {instruccion_usuario}. "
-                        f"Photorealistic 8k, architectural accuracy is priority."
+                        f"User Request: {instruccion_usuario}. Photorealistic 8k."
                     )
 
                     payload = {"contents": [{"parts": [
@@ -84,21 +80,16 @@ if archivo:
 
                     # Fase de dibujo
                     clean_prompt = "".join(e for e in gen_text if e.isalnum() or e == " ")
-                    final_p = f"Professional render, architectural photography, exact building shape, {clean_prompt}"
-                    encoded_p = urllib.parse.quote(final_p[:600])
+                    final_p = f"Professional architectural photography, masterpiece, exact building shape, {clean_prompt}"
+                    encoded_p = urllib.parse.quote(final_p[:700])
                     url_img = f"https://image.pollinations.ai/prompt/{encoded_p}?width=1280&height=720&nologo=true&seed={int(time.time())}"
                     
                     r = requests.get(url_img, timeout=120)
-                    
-                    # AQUÍ ESTABA EL ERROR: Corregido a 200 y con ":"
                     if r.status_code == 200:
                         st.image(r.content, use_container_width=True)
                         st.success("Render finalizado")
-                        st.download_button("💾 Guardar", r.content, "render.png", "image/png")
+                        st.download_button("💾 Guardar", r.content, "render_arquitectia.png", "image/png")
                     else:
-                        st.error(f"Error del servidor: {r.status_code}")
-                        
+                        st.error("Servidor saturado. Reintenta en 5 segundos.")
                 except Exception as e:
                     st.error(f"Error: {e}")
-else:
-    st.info("💡 **Cómo pegar:** Toma la captura (Win + Shift + S), haz un clic en el recuadro azul de arriba y presiona **Ctrl + V**.")
