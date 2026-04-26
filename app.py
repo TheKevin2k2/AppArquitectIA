@@ -10,98 +10,80 @@ import time
 API_KEY = "AIzaSyDCoHVw6g5K1UFEePZmkCv7Co12_OHCoYQ"
 URL_GEMINI = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={API_KEY}"
 
-st.set_page_config(page_title="ArquitectIA: Fidelidad Extrema", layout="wide")
+st.set_page_config(page_title="ArquitectIA: Control Estructural", layout="wide")
 
-st.title("🏗️ ArquitectIA: Control de Estructura v3.0")
+st.title("🏗️ ArquitectIA: Precisión Estructural v4.0")
 
-# 2. Barra Lateral de Control
+# 2. Barra Lateral
 with st.sidebar:
-    st.header("⚙️ Control de Fidelidad")
-    # Este ajuste es clave para que no invente formas
-    fidelidad = st.select_slider(
-        "Respeto al diseño original:",
-        options=["Creativo", "Equilibrado", "Copia Exacta (Geometría Rígida)"],
-        value="Copia Exacta (Geometría Rígida)"
-    )
-    
+    st.header("⚙️ Nivel de Calco")
+    metodo = st.radio("Prioridad:", ["Fotorrealismo (Puede variar formas)", "Estructura Rígida (Fiel al modelo)"])
     st.divider()
-    st.header("🎨 Acabados")
-    estilo = st.selectbox("Estilo:", ["Moderno", "Minimalista", "Industrial", "Contemporáneo"])
-    mat_paredes = st.selectbox("Material Principal:", ["Concreto Pulido", "Ladrillo", "Piedra Natural", "Madera", "Blanco Liso"])
-    clima = st.selectbox("Ambiente:", ["Soleado Directo", "Atardecer", "Nublado Realista"])
+    estilo = st.selectbox("Estilo:", ["Moderno Sobrio", "Minimalista", "Industrial", "Piedra y Madera"])
+    clima = st.selectbox("Luz:", ["Día Soleado", "Atardecer Cálido", "Nublado Suave"])
 
-# 3. Área de Carga
-st.info("💡 Consejo: Asegúrate de que tu captura de SketchUp tenga líneas claras y no esté muy lejos.")
-archivo = st.file_uploader("🖼️ Sube tu captura (Arrastra desde la carpeta de Imágenes)", type=["jpg", "jpeg", "png"])
+# 3. Instrucciones y Carga
+st.subheader("📝 Paso 1: Describe tu diseño")
+instruccion_usuario = st.text_area("Detalla la forma (ej: 'Techo plano con volado a la derecha, dos ventanales altos'):")
 
-# 4. Instrucciones del Arquitecto
-instruccion_usuario = st.text_area("📝 Descripción detallada del render:", 
-                                   placeholder="Ej: Mantén la forma del techo plano, usa marcos de aluminio negro y añade un suelo de grava...")
+archivo = st.file_uploader("🖼️ Paso 2: Sube tu captura de SketchUp", type=["jpg", "jpeg", "png"])
 
 if archivo:
     col1, col2 = st.columns(2)
     img = Image.open(archivo)
     
     with col1:
-        st.subheader("Captura de SketchUp")
+        st.subheader("Tu Modelo")
         st.image(img, use_container_width=True)
 
     if st.button("🚀 GENERAR RENDER FIEL"):
         with col2:
-            with st.spinner("🧠 Analizando geometría estructural..."):
+            with st.spinner("🧠 Analizando volúmenes estructurales..."):
                 try:
-                    # Convertir imagen para Gemini
                     buffered = io.BytesIO()
                     img.save(buffered, format="JPEG")
                     img_byte = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-                    # PROMPT REFORZADO PARA EVITAR ALUCINACIONES
-                    # Usamos palabras de peso como "Photogrammetry", "Architectural accuracy" y "Reference preservation"
-                    modificador_fidelidad = ""
-                    if fidelidad == "Copia Exacta (Geometría Rígida)":
-                        modificador_fidelidad = (
-                            "STRICT ARCHITECTURAL ADHERENCE. Do not change the building's footprint, height, or window placement. "
-                            "Follow the attached image as a rigid template. This is a technical visualization, not an artistic interpretation."
-                        )
-
-                    prompt_completo = (
-                        f"{modificador_fidelidad} "
-                        f"Professional architectural render. Original SketchUp volume must be preserved 100%. "
-                        f"Style: {estilo}. Walls: {mat_paredes}. Lighting: {clima}. "
-                        f"User Instructions: {instruccion_usuario}. "
-                        f"High-quality architectural photography, hyper-realistic textures, realistic environment."
+                    # PROMPT TÉCNICO PARA GEMINI
+                    # Le pedimos que sea un "escáner" de formas
+                    instruccion_gemini = (
+                        "Analiza esta imagen de SketchUp. Actúa como un experto en fotogrametría. "
+                        "Describe la geometría exacta: posición de muros, tipo de techos, ubicación de vanos y ventanas. "
+                        "Tu descripción será usada para recrear la imagen EXACTAMENTE igual. "
+                        f"Estilo solicitado: {estilo}. Luz: {clima}. "
+                        f"Instrucciones extra: {instruccion_usuario}. "
+                        "IMPORTANTE: No añadas elementos que no existan en el volumen original."
                     )
 
                     payload = {"contents": [{"parts": [
-                        {"text": prompt_completo},
+                        {"text": instruccion_gemini},
                         {"inline_data": {"mime_type": "image/jpeg", "data": img_byte}}
                     ]}]}
 
-                    # Pedirle a Gemini que cree el prompt final basado en la imagen
                     res = requests.post(URL_GEMINI, json=payload, timeout=20)
                     data = res.json()
                     
                     if "candidates" in data:
-                        # Gemini ahora describirá la imagen con precisión para que la otra IA no se pierda
-                        gen_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                        descripcion_tecnica = data["candidates"][0]["content"]["parts"][0]["text"]
                     else:
-                        gen_text = prompt_completo
+                        descripcion_tecnica = f"Architectural render of {estilo} building, precise geometry."
 
-                    # Fase de Dibujo: Añadimos parámetros de realismo
-                    clean_p = "".join(e for e in gen_text if e.isalnum() or e == " ")
-                    final_p = f"Architectural photo, realistic, matching reference structure, {clean_p}"
-                    encoded_p = urllib.parse.quote(final_p[:800])
+                    # Fase de Dibujo: Refuerzo de palabras clave de "No Cambio"
+                    clean_p = "".join(e for e in descripcion_tecnica if e.isalnum() or e == " ")
+                    final_p = (
+                        f"Architectural professional photography, "
+                        f"STRICTLY FOLLOWING THIS GEOMETRY: {clean_p}. "
+                        "High resolution, photorealistic materials, do not change original shapes."
+                    )
                     
-                    # Usamos un seed aleatorio para variar si no le gusta el primero
+                    encoded_p = urllib.parse.quote(final_p[:800])
                     url_img = f"https://image.pollinations.ai/prompt/{encoded_p}?width=1280&height=720&nologo=true&seed={int(time.time())}"
                     
                     r = requests.get(url_img, timeout=120)
                     if r.status_code == 200:
                         st.image(r.content, use_container_width=True)
-                        st.success("Render generado respetando la estructura.")
-                        st.download_button("💾 Guardar Render", r.content, "render_fiel.png", "image/png")
-                    else:
-                        st.error("El motor de renderizado está ocupado. Intenta de nuevo.")
+                        st.success("Render finalizado.")
+                        st.download_button("💾 Descargar", r.content, "render.png", "image/png")
 
                 except Exception as e:
-                    st.error(f"Ocurrió un error: {e}")
+                    st.error(f"Error: {e}")
