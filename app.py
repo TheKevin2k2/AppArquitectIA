@@ -6,26 +6,23 @@ import io
 import urllib.parse
 import time
 
-# 1. Usamos solo la clave de Google (que ya tienes y es gratis)
+# 1. Configuración de API
 API_KEY = "AIzaSyDCoHVw6g5K1UFEePZmkCv7Co12_OHCoYQ"
 URL_GEMINI = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={API_KEY}"
 
-st.set_page_config(page_title="ArquitectIA Gratis v8", layout="wide")
+st.set_page_config(page_title="ArquitectIA Gratis v8.1", layout="wide")
+st.markdown("<h1 style='text-align: center;'>🏗️ ArquitectIA Free v8.1</h1>", unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align: center;'>🏗️ ArquitectIA Free v8.0</h1>", unsafe_allow_html=True)
-st.caption("Versión 100% gratuita sin límites de pago")
-
-# 2. Configuración en la barra lateral
+# 2. Barra lateral
 with st.sidebar:
     st.header("🎨 Estética")
     estilo = st.selectbox("Estilo:", ["Minimalista", "Moderno Industrial", "Rústico Contemporáneo"])
     clima = st.selectbox("Ambiente:", ["Día Soleado", "Atardecer Cálido", "Nublado"])
-    st.divider()
-    st.info("Para que salga igual: Activa las SOMBRAS en SketchUp antes de hacer la captura.")
+    st.info("💡 Consejo: Si la captura es muy grande, intenta recortarla un poco antes de subirla.")
 
-# 3. Entrada de archivos
+# 3. Inputs
 archivo = st.file_uploader("🖼️ Sube tu captura de SketchUp", type=["jpg", "jpeg", "png"])
-instrucciones = st.text_input("📝 Materiales (ej: madera, cemento pulido...):")
+instrucciones = st.text_input("📝 Describe materiales (ej: madera, cemento):")
 
 if archivo:
     col1, col2 = st.columns(2)
@@ -37,21 +34,18 @@ if archivo:
 
     if st.button("🚀 GENERAR RENDER GRATIS"):
         with col2:
-            with st.spinner("🧠 Analizando estructura..."):
+            with st.spinner("🧠 Analizando geometría..."):
                 try:
-                    # Convertir imagen para Gemini
+                    # Preparar imagen (la comprimimos un poco para evitar errores de tamaño)
                     buffered = io.BytesIO()
-                    img.save(buffered, format="JPEG")
+                    img = img.convert("RGB")
+                    img.save(buffered, format="JPEG", quality=85)
                     img_byte = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-                    # PROMPT DE "MAPA GEOMÉTRICO"
-                    # Obligamos a Gemini a describir la imagen como si fuera un plano técnico
                     prompt_tecnico = (
-                        "Describe esta imagen de SketchUp para un motor de renderizado. "
-                        "Sé extremadamente específico con los volúmenes: 'un cubo a la izquierda', "
-                        "'un ventanal rectangular al centro', 'techo plano'. "
-                        f"Aplica estos materiales: {instrucciones} y estilo {estilo}. "
-                        "IMPORTANTE: No inventes balcones, ni cambies la forma. Solo describe lo que ves."
+                        f"Describe the architectural volumes of this 3D model accurately. "
+                        f"Mention wall placement and roof type. Style: {estilo}. "
+                        f"Materials: {instrucciones}. Preserve the original geometry."
                     )
 
                     payload = {"contents": [{"parts": [
@@ -59,27 +53,31 @@ if archivo:
                         {"inline_data": {"mime_type": "image/jpeg", "data": img_byte}}
                     ]}]}
 
-                    # Gemini genera la descripción (Gratis)
-                    res = requests.post(URL_GEMINI, json=payload, timeout=20)
-                    descripcion = res.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    # Petición a Gemini
+                    res = requests.post(URL_GEMINI, json=payload, timeout=30)
+                    res_data = res.json()
 
-                    # Limpiamos el texto para la URL
-                    clean_description = "".join(e for e in descripcion if e.isalnum() or e == " ")
+                    # VERIFICACIÓN DE ERROR 'CANDIDATES'
+                    if "candidates" in res_data and len(res_data["candidates"]) > 0:
+                        descripcion = res_data["candidates"][0]["content"]["parts"][0]["text"]
+                        
+                        # Limpiar y codificar para la IA de dibujo
+                        clean_desc = "".join(e for e in descripcion if e.isalnum() or e == " ")
+                        final_prompt = f"Professional architectural photography, {clean_desc}, hyper-realistic, 8k"
+                        encoded_prompt = urllib.parse.quote(final_prompt[:800])
+                        
+                        url_render = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=720&nologo=true&seed={int(time.time())}"
+                        
+                        st.image(url_render, use_container_width=True)
+                        st.success("¡Render generado!")
+                        
+                        img_res = requests.get(url_render)
+                        st.download_button("💾 Guardar Render", img_res.content, "render.png", "image/png")
                     
-                    # Usamos el motor de Pollinations (Gratis e ilimitado)
-                    # Añadimos 'architecture' y 'photorealistic' para forzar calidad
-                    final_prompt = f"Professional architectural photography, high-end render, {clean_description}, hyper-realistic, 8k"
-                    encoded_prompt = urllib.parse.quote(final_prompt[:800])
-                    
-                    # Generamos el render
-                    url_render = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=720&nologo=true&seed={int(time.time())}"
-                    
-                    st.image(url_render, use_container_width=True)
-                    st.success("¡Render generado!")
-                    
-                    # Botón de descarga
-                    r = requests.get(url_render)
-                    st.download_button("💾 Guardar Render", r.content, "render_gratis.png", "image/png")
+                    elif "error" in res_data:
+                        st.error(f"Error de Google Gemini: {res_data['error']['message']}")
+                    else:
+                        st.error("La IA no pudo interpretar esta imagen. Prueba con una captura más clara o menos pesada.")
 
                 except Exception as e:
-                    st.error(f"Hubo un error: {e}")
+                    st.error(f"Error técnico inesperado: {e}")
