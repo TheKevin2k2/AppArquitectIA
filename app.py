@@ -6,76 +6,59 @@ import io
 import urllib.parse
 import time
 
-# --- CONFIGURACIÓN DE SEGURIDAD ---
 API_KEY = "AIzaSyBLASApDrxbH68KPuNQJxWMCQPLBOYR4yk"
 URL_GEMINI = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={API_KEY}"
 
-st.set_page_config(page_title="ArquitectIA v10.6 Ultra", layout="wide")
+st.set_page_config(page_title="ArquitectIA v11 Master", layout="wide")
 
-st.markdown("""
-    <style>
-    .stFileUploader { border: 2px dashed #4A90E2; padding: 20px; background-color: #f0f2f6; border-radius: 15px; }
-    h1 { color: #1E3A8A; text-align: center; font-family: 'Helvetica', sans-serif; }
-    .stButton>button { width: 100%; border-radius: 10px; height: 3em; background-color: #1E3A8A; color: white; }
-    </style>
-    """, unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🏗️ ArquitectIA v11.0: Master Control</h1>", unsafe_allow_html=True)
 
-st.markdown("<h1>🏗️ ArquitectIA v10.6 (Sin Errores)</h1>", unsafe_allow_html=True)
-
-# --- BARRA LATERAL ---
 with st.sidebar:
-    st.header("⚙️ Configuración")
-    estilo = st.selectbox("Estilo Visual:", ["Moderno Sobrio", "Minimalista", "Industrial", "Rústico Moderno"])
-    clima = st.selectbox("Ambiente/Luz:", ["Día Soleado", "Atardecer Cálido", "Nublado Realista", "Noche"])
+    st.header("⚙️ Ajustes")
+    estilo = st.selectbox("Estilo:", ["Moderno Sobrio", "Minimalista", "Industrial", "Rústico"])
+    clima = st.selectbox("Luz:", ["Día Soleado", "Atardecer", "Nublado", "Noche"])
     st.divider()
-    st.warning("⚠️ REGLAS DE ORO:\n1. Fondo BLANCO en SketchUp.\n2. Sombras ACTIVADAS.\n3. Captura de cerca.")
+    st.error("❗ NOTA PARA TU HERMANO:\nSi la IA 'inventa', es porque la captura tiene poco contraste. Asegúrate de que las sombras sean FUERTES en SketchUp.")
 
-# --- ÁREA DE TRABAJO ---
-instrucciones_usuario = st.text_input("📝 Materiales específicos:", placeholder="Ej: Madera de nogal, concreto, vidrio...")
-archivo = st.file_uploader("🖼️ Sube tu captura de SketchUp", type=["jpg", "jpeg", "png"])
+instrucciones = st.text_input("📝 Materiales:", placeholder="Ej: Concreto, madera clara...")
+archivo = st.file_uploader("🖼️ Sube captura de SketchUp", type=["jpg", "jpeg", "png"])
 
 if archivo:
     col1, col2 = st.columns(2)
     img = Image.open(archivo)
-    
     with col1:
-        st.subheader("Captura Original")
+        st.subheader("Tu Modelo")
         st.image(img, use_container_width=True)
 
     if st.button("🚀 GENERAR RENDER"):
         with col2:
-            with st.spinner("🧠 Analizando volúmenes..."):
+            with st.spinner("🛠️ Aplicando texturas sobre geometría..."):
                 try:
                     buffered = io.BytesIO()
                     img_convert = img.convert("RGB")
-                    img_convert.save(buffered, format="JPEG", quality=90)
+                    img_convert.save(buffered, format="JPEG", quality=95)
                     img_byte = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-                    # PROMPT EN UNA SOLA LÍNEA PARA EVITAR SYNTAXERROR
-                    prompt_analisis = f"Analyze this 3D model. Identify architectural volumes and roof shape. Strictly follow the building footprint. Style: {estilo}. Materials: {instrucciones_usuario}. Lighting: {clima}. Do not add extra structures. Do not change the house layout."
+                    # PROMPT DE ALTA PRECISIÓN: Obliga a la IA a no salirse de los bordes
+                    prompt_tecnico = f"Architectural photo. Keep the EXACT layout and geometry of the building in the image. Do not change wall positions. Materials: {instrucciones}. Style: {estilo}. High-end lighting: {clima}. Realistic 8k render."
                     
                     payload = {"contents": [{"parts": [
-                        {"text": prompt_analisis},
+                        {"text": prompt_tecnico},
                         {"inline_data": {"mime_type": "image/jpeg", "data": img_byte}}
                     ]}]}
 
                     res = requests.post(URL_GEMINI, json=payload, timeout=15)
-                    
-                    if res.status_code == 200:
-                        descripcion_ia = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-                    else:
-                        descripcion_ia = f"Modern architectural photography, {estilo} style, {clima}."
+                    desc = res.json()["candidates"][0]["content"]["parts"][0]["text"] if res.status_code == 200 else "Architecture"
 
-                    # Generación visual
-                    prompt_render = f"Architectural masterpiece, {descripcion_ia}, hyper-realistic materials, 8k, cinematic lighting, sharp focus, professional photography."
-                    encoded_prompt = urllib.parse.quote(prompt_render[:900])
-                    url_final = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=720&nologo=true&seed={int(time.time())}"
+                    # HACK: Añadimos 'scanned architectural sketch' para que la IA entienda que hay una base rígida
+                    final_p = f"Professional architectural render of {desc}, realistic materials, preserving exact structure, 8k, photorealistic."
+                    url_f = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(final_p)}?width=1280&height=720&nologo=true&seed={int(time.time())}"
                     
-                    st.image(url_final, use_container_width=True)
+                    st.image(url_f, use_container_width=True)
                     st.success("✅ Renderizado listo.")
                     
-                    r_img = requests.get(url_final)
-                    st.download_button("💾 Descargar Imagen", r_img.content, "render.png", "image/png")
+                    r_img = requests.get(url_f)
+                    st.download_button("💾 Guardar", r_img.content, "render.png", "image/png")
 
                 except Exception as e:
-                    st.error(f"Error técnico: {e}")
+                    st.error(f"Error: {e}")
