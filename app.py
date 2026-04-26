@@ -6,120 +6,80 @@ import io
 import urllib.parse
 import time
 
-# --- CONFIGURACIÓN DE SEGURIDAD ---
-try:
-    FAL_KEY = st.secrets["FAL_KEY"]
-except:
-    FAL_KEY = "FALTA_CLAVE"
+# 1. Usamos solo la clave de Google (que ya tienes y es gratis)
+API_KEY = "AIzaSyDCoHVw6g5K1UFEePZmkCv7Co12_OHCoYQ"
+URL_GEMINI = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={API_KEY}"
 
-st.set_page_config(page_title="ArquitectIA Pro: Control Estructural", layout="wide")
+st.set_page_config(page_title="ArquitectIA Gratis v8", layout="wide")
 
-# --- INTERFAZ VISUAL ---
-st.markdown("""
-    <style>
-    .stFileUploader {
-        border: 2px dashed #4A90E2;
-        padding: 20px;
-        background-color: #f0f2f6;
-        border-radius: 15px;
-    }
-    .main-title {
-        color: #1E3A8A;
-        text-align: center;
-        font-weight: bold;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>🏗️ ArquitectIA Free v8.0</h1>", unsafe_allow_html=True)
+st.caption("Versión 100% gratuita sin límites de pago")
 
-st.markdown("<h1 class='main-title'>🏗️ ArquitectIA Pro v7.3</h1>", unsafe_allow_html=True)
-
-# --- BARRA LATERAL ---
+# 2. Configuración en la barra lateral
 with st.sidebar:
-    st.header("⚙️ Ajustes de Precisión")
-    estilo = st.selectbox("Estilo Arquitectónico:", ["Moderno Sobrio", "Minimalista", "Industrial", "Rústico Moderno"])
-    mat_paredes = st.selectbox("Material Principal:", ["Concreto Visto", "Ladrillo", "Piedra", "Estuco Blanco", "Madera"])
-    clima = st.selectbox("Iluminación:", ["Día Soleado", "Atardecer Cálido", "Nublado Realista", "Noche"])
-    
+    st.header("🎨 Estética")
+    estilo = st.selectbox("Estilo:", ["Minimalista", "Moderno Industrial", "Rústico Contemporáneo"])
+    clima = st.selectbox("Ambiente:", ["Día Soleado", "Atardecer Cálido", "Nublado"])
     st.divider()
-    
-    structural_strength = st.slider(
-        "Fidelidad Estructural (0.90 = No cambia la forma):",
-        min_value=0.0, max_value=1.0, value=0.90, step=0.05
-    )
-    
-    st.info("💡 Consejo: Usa 0.90 para que la IA respete cada muro de SketchUp.")
-    
-    if st.button("🗑️ Limpiar Pantalla"):
-        st.rerun()
+    st.info("Para que salga igual: Activa las SOMBRAS en SketchUp antes de hacer la captura.")
 
-# --- ÁREA DE TRABAJO ---
-st.subheader("📝 Detalles Finales")
-instruccion_usuario = st.text_area(
-    "Describe materiales específicos y el entorno:",
-    placeholder="Ej: Suelo de madera clara, marcos de ventanas negros, añadir mucha vegetación y jardín..."
-)
-
-archivo = st.file_uploader("🖼️ Sube tu captura de SketchUp aquí", type=["jpg", "jpeg", "png"])
+# 3. Entrada de archivos
+archivo = st.file_uploader("🖼️ Sube tu captura de SketchUp", type=["jpg", "jpeg", "png"])
+instrucciones = st.text_input("📝 Materiales (ej: madera, cemento pulido...):")
 
 if archivo:
     col1, col2 = st.columns(2)
     img = Image.open(archivo)
     
     with col1:
-        st.subheader("Tu Modelo Original")
+        st.subheader("Tu Diseño")
         st.image(img, use_container_width=True)
 
-    if st.button("🚀 GENERAR RENDER PROFESIONAL"):
-        if FAL_KEY == "FALTA_CLAVE":
-            st.error("⚠️ Error: No has configurado la clave 'FAL_KEY' en los Secrets de Streamlit.")
-        else:
-            with col2:
-                with st.spinner("🧠 Procesando geometría y texturas..."):
-                    try:
-                        # 1. Preparar imagen
-                        buffered = io.BytesIO()
-                        img.save(buffered, format="PNG")
-                        img_byte = base64.b64encode(buffered.getvalue()).decode("utf-8")
-                        image_url = f"data:image/png;base64,{img_byte}"
+    if st.button("🚀 GENERAR RENDER GRATIS"):
+        with col2:
+            with st.spinner("🧠 Analizando estructura..."):
+                try:
+                    # Convertir imagen para Gemini
+                    buffered = io.BytesIO()
+                    img.save(buffered, format="JPEG")
+                    img_byte = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-                        # 2. Prompt unido en una sola línea para evitar SyntaxError
-                        prompt_final = f"Professional architectural photography. Style: {estilo}. Walls: {mat_paredes}. Lighting: {clima}. {instruccion_usuario}. High-end materials, 8k resolution, strictly preserve original building geometry and footprint."
+                    # PROMPT DE "MAPA GEOMÉTRICO"
+                    # Obligamos a Gemini a describir la imagen como si fuera un plano técnico
+                    prompt_tecnico = (
+                        "Describe esta imagen de SketchUp para un motor de renderizado. "
+                        "Sé extremadamente específico con los volúmenes: 'un cubo a la izquierda', "
+                        "'un ventanal rectangular al centro', 'techo plano'. "
+                        f"Aplica estos materiales: {instrucciones} y estilo {estilo}. "
+                        "IMPORTANTE: No inventes balcones, ni cambies la forma. Solo describe lo que ves."
+                    )
 
-                        # 3. Llamada al motor Fal.ai
-                        url_fal = "https://fal.run/fal-ai/flux/dev/image-to-image"
-                        headers = {
-                            "Authorization": f"Key {FAL_KEY}",
-                            "Content-Type": "application/json"
-                        }
-                        
-                        payload = {
-                            "prompt": prompt_final,
-                            "image_url": image_url,
-                            "strength": 1.0 - structural_strength,
-                            "num_inference_steps": 40,
-                            "guidance_scale": 7.5
-                        }
+                    payload = {"contents": [{"parts": [
+                        {"text": prompt_tecnico},
+                        {"inline_data": {"mime_type": "image/jpeg", "data": img_byte}}
+                    ]}]}
 
-                        res = requests.post(url_fal, json=payload, headers=headers, timeout=120)
-                        
-                        if res.status_code == 200:
-                            data = res.json()
-                            if "images" in data:
-                                render_url = data["images"][0]["url"]
-                                st.image(render_url, use_container_width=True)
-                                st.success("✅ Renderizado completado.")
-                                
-                                img_res = requests.get(render_url)
-                                st.download_button(
-                                    label="💾 Descargar Imagen",
-                                    data=img_res.content,
-                                    file_name="render_arquitectia.png",
-                                    mime="image/png"
-                                )
-                            else:
-                                st.error("No se generó la imagen.")
-                        else:
-                            st.error(f"Error de API: {res.status_code}. Revisa tus créditos.")
+                    # Gemini genera la descripción (Gratis)
+                    res = requests.post(URL_GEMINI, json=payload, timeout=20)
+                    descripcion = res.json()["candidates"][0]["content"]["parts"][0]["text"]
 
-                    except Exception as e:
-                        st.error(f"Error técnico: {e}")
+                    # Limpiamos el texto para la URL
+                    clean_description = "".join(e for e in descripcion if e.isalnum() or e == " ")
+                    
+                    # Usamos el motor de Pollinations (Gratis e ilimitado)
+                    # Añadimos 'architecture' y 'photorealistic' para forzar calidad
+                    final_prompt = f"Professional architectural photography, high-end render, {clean_description}, hyper-realistic, 8k"
+                    encoded_prompt = urllib.parse.quote(final_prompt[:800])
+                    
+                    # Generamos el render
+                    url_render = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1280&height=720&nologo=true&seed={int(time.time())}"
+                    
+                    st.image(url_render, use_container_width=True)
+                    st.success("¡Render generado!")
+                    
+                    # Botón de descarga
+                    r = requests.get(url_render)
+                    st.download_button("💾 Guardar Render", r.content, "render_gratis.png", "image/png")
+
+                except Exception as e:
+                    st.error(f"Hubo un error: {e}")
