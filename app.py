@@ -14,53 +14,60 @@ st.set_page_config(page_title="ArquitectIA Pro", layout="wide")
 
 st.title("🏗️ ArquitectIA: Renderizado de Precisión")
 
-# 2. Guía de Uso
-st.info("""
-**💡 Tip de flujo rápido:**
-1. Toma tu captura en SketchUp (**Win + Shift + S**).
-2. Haz **un clic** en el recuadro azul de abajo (ignora la ventana de archivos que se abre).
-3. Presiona **Ctrl + V** en tu teclado para pegar.
-""")
-
-# 3. Barra Lateral
+# 2. Barra Lateral
 with st.sidebar:
     st.header("🎨 Ajustes")
     estilo = st.selectbox("Estilo:", ["Minimalista Moderno", "Industrial Loft", "Rústico", "Futurista"])
-    fidelidad = st.radio("Fidelidad Estructural:", ["Estricta (No mover muros)", "Equilibrada", "Creativa"])
+    fidelidad = st.radio("Fidelidad Estructural:", ["Estricta", "Equilibrada", "Creativa"])
     mat_paredes = st.selectbox("Paredes:", ["Concreto", "Ladrillo", "Piedra", "Estuco", "Madera"])
     clima = st.selectbox("Iluminación:", ["Soleado", "Atardecer", "Noche", "Nublado"])
+    st.divider()
+    st.caption("v2.5 - Emergency Paste Mode")
 
-# 4. Input de usuario
-st.subheader("📝 Instrucciones de diseño")
-instruccion_usuario = st.text_area("Detalles extra:", placeholder="Ej: Añadir marcos negros a las ventanas...")
+# 3. ZONA DE CARGA (Doble Vía)
+st.subheader("📸 Paso 1: Sube tu modelo")
+tabs = st.tabs(["📁 Subir Archivo", "📋 Pegar Captura (Alternativo)"])
 
-# Cargador de archivos
-archivo = st.file_uploader("🔽 PEGA O ARRASTRA AQUÍ TU CAPTURA", type=["jpg", "jpeg", "png"])
+with tabs[0]:
+    archivo_subido = st.file_uploader("Arrastra aquí tu captura de SketchUp", type=["jpg", "jpeg", "png"])
+
+with tabs[1]:
+    st.write("Si el Ctrl+V no funciona arriba, usa este método:")
+    # Este componente es un truco: permite recibir datos de imagen si el navegador bloquea el uploader
+    archivo_pegado = st.chat_input("Haz clic aquí y presiona Ctrl+V (o escribe algo y dale enter)")
+    st.caption("Nota: Algunos navegadores requieren que guardes la imagen y la arrastres si el portapapeles está protegido.")
+
+# Decidir qué archivo usar
+archivo = archivo_subido if archivo_subido else archivo_pegado
+
+# 4. Instrucciones de diseño
+st.subheader("📝 Paso 2: Detalles del Render")
+instruccion_usuario = st.text_area("Órdenes para la IA:", placeholder="Ej: Que las ventanas tengan marcos negros...")
 
 if archivo:
     col_pre, col_res = st.columns(2)
-    img = Image.open(archivo)
     
-    with col_pre:
-        st.subheader("Modelo Original")
-        st.image(img, use_container_width=True)
+    # Manejo de la imagen (archivo o datos de chat)
+    try:
+        if hasattr(archivo, 'read'):
+            img = Image.open(archivo)
+        else:
+            st.warning("Para pegar imágenes, lo más seguro es arrastrar el archivo directamente al recuadro de 'Subir Archivo'.")
+            st.stop()
+            
+        with col_pre:
+            st.subheader("Modelo Original")
+            st.image(img, use_container_width=True)
 
-    if st.button("🚀 GENERAR RENDER"):
-        with col_res:
-            with st.spinner("🧠 Generando fotorrealismo..."):
-                try:
+        if st.button("🚀 GENERAR RENDER"):
+            with col_res:
+                with st.spinner("🧠 Generando fotorrealismo..."):
                     buffered = io.BytesIO()
                     img.save(buffered, format="JPEG")
                     img_byte = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-                    # Refuerzo de prompt
-                    strict = "Keep the exact original building volume." if fidelidad == "Estricta (No mover muros)" else ""
-                    
-                    prompt_completo = (
-                        f"{strict} Architectural photography. Style: {estilo}. "
-                        f"Walls: {mat_paredes}. Light: {clima}. "
-                        f"Details: {instruccion_usuario}. High resolution, 8k."
-                    )
+                    strict = "KEEP EXACT GEOMETRY. DO NOT CHANGE THE BUILDING SHAPE." if fidelidad == "Estricta" else ""
+                    prompt_completo = f"{strict} Architecture style {estilo}, walls {mat_paredes}, {clima}. {instruccion_usuario}"
 
                     payload = {"contents": [{"parts": [
                         {"text": prompt_completo},
@@ -71,18 +78,14 @@ if archivo:
                     data = res.json()
                     gen_text = data["candidates"][0]["content"]["parts"][0]["text"] if "candidates" in data else prompt_completo
 
-                    # Dibujo
                     clean_p = "".join(e for e in gen_text if e.isalnum() or e == " ")
-                    final_p = f"Professional architectural render, masterpiece, {clean_p}"
+                    final_p = f"Professional architectural photography, masterpiece, {clean_p}"
                     url_img = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(final_p[:700])}?width=1280&height=720&nologo=true&seed={int(time.time())}"
                     
                     r = requests.get(url_img, timeout=120)
                     if r.status_code == 200:
                         st.image(r.content, use_container_width=True)
                         st.success("¡Render listo!")
-                        # LÍNEA CORREGIDA: Se cerraron todos los paréntesis correctamente
                         st.download_button(label="💾 Descargar Imagen", data=r.content, file_name="render.png", mime="image/png")
-                    else:
-                        st.error(f"Error del servidor: {r.status_code}")
-                except Exception as e:
-                    st.error(f"Error: {e}")
+    except Exception as e:
+        st.error(f"Error al procesar la imagen: {e}")
