@@ -14,12 +14,12 @@ st.set_page_config(page_title="ArquitectIA Pro", layout="wide")
 
 st.title("🏗️ ArquitectIA: Renderizado de Precisión")
 
-# 2. Instrucciones Dinámicas
+# 2. Guía de Uso
 st.info("""
-**💡 Guía para pegar capturas:**
+**💡 Tip de flujo rápido:**
 1. Toma tu captura en SketchUp (**Win + Shift + S**).
-2. Haz **un clic** en el recuadro de abajo (ignora si se abre la carpeta).
-3. Presiona **Ctrl + V** en tu teclado.
+2. Haz **un clic** en el recuadro azul de abajo (ignora la ventana de archivos que se abre).
+3. Presiona **Ctrl + V** en tu teclado para pegar.
 """)
 
 # 3. Barra Lateral
@@ -30,10 +30,11 @@ with st.sidebar:
     mat_paredes = st.selectbox("Paredes:", ["Concreto", "Ladrillo", "Piedra", "Estuco", "Madera"])
     clima = st.selectbox("Iluminación:", ["Soleado", "Atardecer", "Noche", "Nublado"])
 
-# 4. Área de Carga y Prompt
-instruccion_usuario = st.text_area("📝 Instrucciones de diseño:", placeholder="Ej: Añadir marcos negros a las ventanas y un camino de piedra...")
+# 4. Input de usuario
+st.subheader("📝 Instrucciones de diseño")
+instruccion_usuario = st.text_area("Detalles extra:", placeholder="Ej: Añadir marcos negros a las ventanas...")
 
-# El componente de Streamlit ya procesa el pegado si tiene el foco
+# Cargador de archivos
 archivo = st.file_uploader("🔽 PEGA O ARRASTRA AQUÍ TU CAPTURA", type=["jpg", "jpeg", "png"])
 
 if archivo:
@@ -52,8 +53,8 @@ if archivo:
                     img.save(buffered, format="JPEG")
                     img_byte = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-                    # Refuerzo de prompt para respetar SketchUp
-                    strict = "Keep the exact original building volume and architectural lines." if fidelidad == "Estricta (No mover muros)" else ""
+                    # Refuerzo de prompt
+                    strict = "Keep the exact original building volume." if fidelidad == "Estricta (No mover muros)" else ""
                     
                     prompt_completo = (
                         f"{strict} Architectural photography. Style: {estilo}. "
@@ -79,4 +80,9 @@ if archivo:
                     if r.status_code == 200:
                         st.image(r.content, use_container_width=True)
                         st.success("¡Render listo!")
-                        st.download_button("💾 Descargar", r.content,
+                        # LÍNEA CORREGIDA: Se cerraron todos los paréntesis correctamente
+                        st.download_button(label="💾 Descargar Imagen", data=r.content, file_name="render.png", mime="image/png")
+                    else:
+                        st.error(f"Error del servidor: {r.status_code}")
+                except Exception as e:
+                    st.error(f"Error: {e}")
