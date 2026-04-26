@@ -10,92 +10,83 @@ import time
 API_KEY = "AIzaSyDCoHVw6g5K1UFEePZmkCv7Co12_OHCoYQ"
 URL_GEMINI = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={API_KEY}"
 
-st.set_page_config(page_title="ArquitectIA: Edición Profesional", layout="wide")
-st.title("🏗️ ArquitectIA: Control Total de Diseño")
+st.set_page_config(page_title="ArquitectIA Pro: Control Total", layout="wide")
 
-# 2. Barra Lateral con Control de Materiales
+# Estilo personalizado para resaltar el área de pegado
+st.markdown("""
+    <style>
+    .stFileUploader {
+        border: 2px dashed #4A90E2;
+        border-radius: 10px;
+        padding: 10px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.title("🏗️ ArquitectIA: Renderizado Profesional")
+st.write("Copia tu captura en SketchUp y **pégala aquí abajo con Ctrl+V**")
+
+# 2. Barra Lateral
 with st.sidebar:
-    st.header("🎨 Parámetros Técnicos")
-    estilo = st.selectbox("Estilo Base:", ["Minimalista Moderno", "Industrial Loft", "Rústico Elegante", "Futurista", "Contemporáneo"])
+    st.header("🎨 Ajustes de Precisión")
+    estilo = st.selectbox("Estilo:", ["Minimalista Moderno", "Industrial Loft", "Rústico", "Futurista"])
     
-    st.subheader("Fidelidad del Diseño")
-    fidelidad = st.select_slider("Nivel de respeto al modelo original:", options=["Creativo", "Equilibrado", "Estricto"], value="Estricto")
+    st.subheader("Rigidez Estructural")
+    fidelidad = st.radio("Respeto al volumen original:", ["Máximo (No cambiar formas)", "Equilibrado", "Artístico"])
     
-    st.subheader("Acabados")
-    mat_paredes = st.selectbox("Paredes:", ["Concreto Aparente", "Ladrillo Visto", "Piedra", "Blanco Liso", "Madera"])
-    clima = st.selectbox("Iluminación:", ["Soleado de tarde", "Atardecer", "Luz de Luna", "Nublado"])
+    mat_paredes = st.selectbox("Paredes:", ["Concreto", "Ladrillo", "Piedra", "Estuco", "Madera"])
+    clima = st.selectbox("Iluminación:", ["Soleado", "Atardecer", "Noche", "Nublado"])
     
     st.divider()
-    st.info("💡 Tip: Para subir capturas rápido, presiona 'Impr Pant' en SketchUp y luego haz clic en el cargador de abajo y presiona Ctrl+V.")
+    st.caption("v2.1 - Soporte de portapapeles activado")
 
-# 3. Área Principal de Instrucciones
-st.subheader("📝 Instrucciones Personalizadas")
-prompt_usuario = st.text_area(
-    "Describe detalles específicos (ej: 'añadir un auto deportivo rojo en la entrada', 'que las ventanas tengan reflejos verdes'):",
-    placeholder="Escribe aquí tu visión para el render..."
-)
+# 3. Input de usuario (Prompt abierto)
+st.subheader("💬 Instrucciones adicionales para la IA")
+instruccion_usuario = st.text_area("Ejemplo: 'Que la puerta sea de roble oscuro y añade un jardín seco en el frente'", placeholder="Escribe aquí los detalles que la IA debe respetar...")
 
-# El cargador de archivos de Streamlit ya permite pegar imágenes directamente (Ctrl+V)
-archivo = st.file_uploader("Sube o PEGA (Ctrl+V) tu captura de SketchUp", type=["jpg", "jpeg", "png"])
+# Cargador de archivos mejorado
+archivo = st.file_uploader("Haz clic aquí y presiona Ctrl + V para pegar la captura", type=["jpg", "jpeg", "png"])
 
 if archivo:
     col1, col2 = st.columns(2)
     img = Image.open(archivo)
     
     with col1:
-        st.subheader("Modelo Original")
+        st.subheader("Referencia original")
         st.image(img, use_container_width=True)
 
-    if st.button("🚀 GENERAR RENDER PROFESIONAL"):
+    if st.button("🚀 GENERAR RENDER"):
         with col2:
-            st.subheader("Resultado Final")
-            
-            with st.spinner("🧠 Sincronizando visión con el modelo 3D..."):
+            with st.spinner("🧠 Sincronizando materiales..."):
                 try:
                     buffered = io.BytesIO()
                     img.save(buffered, format="JPEG")
                     img_byte = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-                    # PROMPT REFORZADO PARA EVITAR QUE CAMBIE EL DISEÑO
-                    instruccion_base = (
-                        f"ARCHITECTURAL RENDER. You MUST maintain the EXACT structural geometry and perspective of the building in the image. "
-                        f"Do not change walls, roofs, or openings. Style: {estilo}. "
+                    # PROMPT ULTRA-ESTRICTO PARA NO CAMBIAR EL DISEÑO
+                    prompt_fidelidad = "STRICT GEOMETRY. Do not alter the building's shape, windows, or roof lines." if fidelidad == "Máximo (No cambiar formas)" else "Maintain overall structure."
+                    
+                    prompt_completo = (
+                        f"{prompt_fidelidad} Architectural visualization. Style: {estilo}. "
                         f"Materials: {mat_paredes}. Lighting: {clima}. "
-                        f"User instructions: {prompt_usuario}. "
-                        f"High-end exterior photography, architectural accuracy, photorealistic textures."
+                        f"Specific User Request: {instruccion_usuario}. "
+                        f"Photorealistic 8k, architectural accuracy is priority."
                     )
 
                     payload = {"contents": [{"parts": [
-                        {"text": instruccion_base},
+                        {"text": prompt_completo},
                         {"inline_data": {"mime_type": "image/jpeg", "data": img_byte}}
                     ]}]}
 
                     res = requests.post(URL_GEMINI, json=payload, timeout=20)
                     data = res.json()
+                    gen_text = data["candidates"][0]["content"]["parts"][0]["text"] if "candidates" in data else prompt_completo
 
-                    if "candidates" in data:
-                        gen_text = data["candidates"][0]["content"]["parts"][0]["text"]
-                    else:
-                        gen_text = instruccion_base
-
-                    # Fase de Dibujo
+                    # Fase de dibujo
                     clean_prompt = "".join(e for e in gen_text if e.isalnum() or e == " ")
-                    # Añadimos palabras clave de control para Pollinations
-                    final_prompt = f"highly detailed architectural render, exact structure, {clean_prompt}"
-                    encoded_prompt = urllib.parse.quote(final_prompt[:600])
-                    seed = int(time.time())
-                    url_imagen = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1240&height=720&nologo=true&seed={seed}"
+                    final_p = f"Professional render, architectural photography, exact building shape, {clean_prompt}"
+                    encoded_p = urllib.parse.quote(final_p[:600])
+                    url_img = f"https://image.pollinations.ai/prompt/{encoded_p}?width=1280&height=720&nologo=true&seed={int(time.time())}"
                     
-                    with st.spinner("🎨 Aplicando materiales..."):
-                        r = requests.get(url_imagen, timeout=120) 
-                        
-                        if r.status_code == 200:
-                            st.image(r.content, use_container_width=True)
-                            st.success("¡Renderizado con éxito!")
-                            st.download_button("💾 Descargar", r.content, f"render.png", "image/png")
-                        else:
-                            st.error("Error en el servidor de arte.")
-                            st.markdown(f"👉 [Enlace directo]({url_imagen})")
-
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                    r = requests.get(url_img, timeout=120)
+                    if r.status_code == 20
